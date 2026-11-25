@@ -1,0 +1,28 @@
+name: Network Guardian
+version: "0.3.0"
+slug: network_guardian
+description: Local DNS monitoring and network security
+arch:
+  - aarch64
+startup: services
+boot: auto
+init: false
+host_network: true
+
+ingress: true
+ingress_port: 8099
+panel_icon: mdi:shield-check
+panel_title: Network Guardian
+panel_admin: true
+
+options:
+  adguard_url: "http://127.0.0.1:45158"
+  poll_interval: 10
+  retention_days: 30
+  learning_days: 7
+
+schema:
+  adguard_url: str
+  poll_interval: int(5,300)
+  retention_days: int(7,365)
+  learning_days: int(1,30)
