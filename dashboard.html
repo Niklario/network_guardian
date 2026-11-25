@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Network Guardian</title>
+<style>
+    :root {
+        color-scheme: dark;
+        font: 14px system-ui;
+        background: #0b1018;
+        color: #e2e8f0
+    }
+
+    * {
+        box-sizing: border-box
+    }
+
+    body {
+        margin: 0;
+        padding: 22px;
+        max-width: 1500px;
+        margin: auto
+    }
+
+    header {
+        display: flex;
+        align-items: center;
+        gap: 14px
+    }
+
+    h1 {
+        font-size: 24px;
+        margin: 0
+    }
+
+    small,
+    .muted {
+        color: #94a3b8
+    }
+
+    nav {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 24px 0
+    }
+
+    button,
+    input,
+    select {
+        font: inherit;
+        color: inherit;
+        background: #172232;
+        border: 1px solid #29384b;
+        border-radius: 8px;
+        padding: 10px
+    }
+
+    button {
+        cursor: pointer
+    }
+
+    button.active {
+        background: #2563eb;
+        border-color: #2563eb
+    }
+
+    .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+        gap: 12px
+    }
+
+    .card,
+    section {
+        background: #131c29;
+        border: 1px solid #253041;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 14px
+    }
+
+    .metric {
+        font-size: 28px;
+        font-weight: 700;
+        margin-top: 8px
+    }
+
+    h2 {
+        font-size: 17px;
+        margin: 0 0 16px
+    }
+
+    .table {
+        overflow: auto
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        text-align: left;
+        white-space: nowrap
+    }
+
+    td,
+    th {
+        padding: 11px;
+        border-bottom: 1px solid #253041
+    }
+
+    th {
+        color: #94a3b8;
+        font-size: 12px
+    }
+
+    tr[data-client] {
+        cursor: pointer
+    }
+
+    tr[data-client]:hover {
+        background: #203047
+    }
+
+    .red {
+        color: #f87171
+    }
+
+    .green {
+        color: #4ade80
+    }
+
+    .bar {
+        height: 9px;
+        background: #263345;
+        border-radius: 5px;
+        overflow: hidden;
+        margin: 8px 0 16px
+    }
+
+    .bar i {
+        display: block;
+        height: 100%;
+        background: #3b82f6
+    }
+
+    .tools {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 14px
+    }
+
+    .tools input {
+        flex: 1;
+        min-width: 130px
+    }
+
+    #status {
+        margin-left: auto
+    }
+
+    #chart {
+        display: flex;
+        align-items: end;
+        gap: 4px;
+        height: 130px
+    }
+
+    #chart div {
+        flex: 1;
+        background: #3b82f6;
+        min-width: 2px;
+        border-radius: 3px 3px 0 0
+    }
+
+    footer {
+        margin-top: 20px;
+        color: #94a3b8;
+        font-size: 12px
+    }
+</style>
+<header><span style="font-size:32px;color:#60a5fa">◈</span>
+    <div>
+        <h1>Network Guardian</h1><small>LOCAL SECURITY CENTER · v0.3.0</small>
+    </div><small id="status">Connecting…</small>
+</header>
+<nav id="nav"></nav>
+<div class="tools" id="tools" hidden><select id="client">
+        <option value="">All clients</option>
+    </select><input id="search" placeholder="Search domain"></div>
+<main id="main"></main>
+<footer>Local processing · SQLite · AI disabled · Automatic blocking disabled</footer>
+<script>
+    const $ = id => document.getElementById(id), tabs = ['Overview', 'Devices', 'Live DNS', 'Domains', 'Events', 'Learning', 'Settings']; let tab = 'Overview', data = null, busy = false; const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); const num = v => Number(v || 0).toLocaleString(); const date = v => new Date(v * 1000).toLocaleString(); const pct = (a, b) => b ? (100 * a / b).toFixed(1) : '0.0'; const table = (headers, rows) => `<div class="table"><table><thead><tr>${headers.map(x => `<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.join('') || '<tr><td>No records</td></tr>'}</tbody></table></div>`; const row = (cells, client) => `<tr ${client ? 'data-client="' + esc(client) + '"' : ''}>${cells.map(x => `<td>${esc(x)}</td>`).join('')}</tr>`; const section = (title, body) => `<section><h2>${esc(title)}</h2>${body}</section>`;
+    function switchTab(t) { tab = t; render(); refresh() }
+    function render() {
+        $('nav').innerHTML = tabs.map(t => `<button class="${t === tab ? 'active' : ''}" data-tab="${t}">${t}</button>`).join(''); $('tools').style.display = ['Live DNS', 'Domains'].includes(tab) ? 'flex' : 'none'; if (!data) return; let d = data, s = d.summary, html = ''; let current = $('client').value; $('client').innerHTML = '<option value="">All clients</option>' + d.devices.map(x => `<option value="${esc(x.client)}">${esc(x.client)}</option>`).join(''); $('client').value = current;
+        if (tab === 'Overview') { html = '<div class="cards">' + [['DNS queries · 24h', num(s.total)], ['Clients · 24h', num(s.clients)], ['Blocked · 24h', num(s.blocked)], ['Block rate · 24h', pct(s.blocked, s.total) + '%']].map(x => `<div class="card"><small>${x[0]}</small><div class="metric">${x[1]}</div></div>`).join('') + '</div>'; let end = Math.floor(d.now / 3600) * 3600, hours = Array.from({ length: 25 }, (_, i) => { let h = end - (24 - i) * 3600; return d.hours.find(x => x.hour === h) || { hour: h, total: 0 } }), max = Math.max(1, ...hours.map(x => x.total)); html += section('DNS activity · last 24 hours', '<div id="chart">' + hours.map(x => `<div title="${esc(date(x.hour))}: ${x.total}" style="height:${100 * x.total / max}%"></div>`).join('') + '</div>'); html += section('Most active clients · retained history', d.devices.slice(0, 8).map(x => `<div data-client="${esc(x.client)}" style="cursor:pointer">${esc(x.client)} · ${num(x.total)} queries<div class="bar"><i style="width:${100 * x.total / Math.max(1, d.devices[0].total)}%"></i></div></div>`).join('')) }
+        if (tab === 'Devices') html = section('Client profiles · retained history', table(['IP address', 'Queries', 'Domains', 'Blocked', 'Last seen'], d.devices.map(x => row([x.client, num(x.total), num(x.domains), num(x.blocked), date(x.last_seen)], x.client))));
+        if (tab === 'Live DNS') html = section('Latest 200 matching queries', table(['Time', 'Client', 'Domain', 'Type', 'Result'], d.live.map(x => row([x.timestamp, x.client, x.domain, x.query_type, x.reason]))));
+        if (tab === 'Domains') html = section('Top 200 matching domains · retained history', table(['Domain', 'Queries', 'Blocked', 'Clients'], d.domains.map(x => row([x.domain, num(x.total), num(x.blocked), num(x.clients)]))));
+        if (tab === 'Events') html = section('Security events', table(['Time', 'Client', 'Severity', 'Type', 'Details'], d.events.map(x => row([date(x.timestamp), x.client, x.severity, x.event_type, x.message]))));
+        if (tab === 'Learning') html = section('Baseline age · not a guarantee of sufficient samples', d.devices.map(x => { let age = Math.max(0, (d.now - x.first_seen) / 86400), p = Math.min(100, age / d.learning_days * 100); return `<div>${esc(x.client)} · ${age.toFixed(2)} / ${d.learning_days} days · ${p >= 100 ? 'Age threshold met' : 'Learning'}<div class="bar"><i style="width:${p}%"></i></div></div>` }).join(''));
+        if (tab === 'Settings') html = section('Configuration', '<p>Learning period: ' + esc(d.learning_days) + ' days</p><p>AI: Disabled</p><p>Automatic blocking: Disabled</p><p>Change settings in Home Assistant → Apps → Network Guardian → Configuration.</p>'); $('main').innerHTML = html
+    }
+    async function refresh() { if (busy) return; busy = true; try { let p = new URLSearchParams({ client: $('client').value, search: $('search').value }); let r = await fetch('api/data?' + p, { cache: 'no-store' }); if (!r.ok) throw Error(r.status); data = await r.json(); $('status').textContent = 'Updated ' + new Date().toLocaleTimeString(); render() } catch (e) { $('status').textContent = 'Connection error: ' + e.message } finally { busy = false } }
+    $('nav').onclick = e => { if (e.target.dataset.tab) switchTab(e.target.dataset.tab) }; $('main').onclick = e => { let el = e.target.closest('[data-client]'); if (el) { $('client').value = el.dataset.client; $('search').value = ''; switchTab('Live DNS') } }; $('client').onchange = refresh; let timer; $('search').oninput = () => { clearTimeout(timer); timer = setTimeout(refresh, 300) }; render(); refresh(); setInterval(refresh, 10000);
+</script>
+
+</html>
